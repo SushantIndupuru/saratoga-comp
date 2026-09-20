@@ -105,7 +105,7 @@ PORT12,
 
 );
 
-int current_auton_selection = 1;
+int current_auton_selection = 0;
 bool auto_started = false;
 bool driver_started = false;
 
@@ -241,6 +241,7 @@ void pre_auton() {
 
 void autonomous(void) {
   auto_started = true;
+  init_cascade_position();
   switch(current_auton_selection){ 
     case 0:
       strong_side_2_2();

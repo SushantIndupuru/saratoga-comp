@@ -243,7 +243,6 @@ void holonomic_odom_test(){
 void strong_side_2_2() {
   odom_constants();
   chassis.drive_settle_error = 1.5;
-  init_cascade_position();
   Claw.set(true);
   chassis.set_coordinates(0, 0, 180);
   
@@ -255,18 +254,19 @@ void strong_side_2_2() {
   // task::sleep(300);
   // chassis.drive_distance(4, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 600);
   // Claw.set(false);
-  chassis.drive_distance(8, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 300);
+  chassis.drive_distance(8, 180, 6, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 300);
   chassis.drive_distance(-5);
   task::sleep(100);
-  chassis.drive_distance(10, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
-  chassis.drive_distance(-16);
+  chassis.drive_distance(10, 180, 6, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  chassis.drive_distance(-15.5);
   chassis.turn_to_angle(270);
-  chassis.drive_distance(-13, 270, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
-  Roller.setVelocity(100, percent);
+  chassis.drive_distance(-11.75, 270, 4, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  Roller.setVelocity(5, percent);
   task::sleep(700);
   Roller.spinFor(forward, 700, degrees);
-  chassis.drive_distance(13, 270, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
-  chassis.turn_to_angle(45);
+  task::sleep(700);
+  chassis.drive_distance(12, 270, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  chassis.turn_to_angle(45,12,0.5,800,9999);
   Claw.set(true);
   chassis.drive_distance(20);
   chassis.drive_max_voltage = 4;
@@ -274,8 +274,9 @@ void strong_side_2_2() {
   task::sleep(500);
   Claw.set(false);
   task::sleep(500);
-  set_cascade_target(-200);
+  set_cascade_target(-100);
   task::sleep(500);
+  chassis.drive_distance(8);
   chassis.turn_to_angle(180);
   chassis.drive_distance(15);
 
@@ -284,7 +285,6 @@ void strong_side_2_2() {
 void weak_side() {
   odom_constants();
   chassis.drive_settle_error = 1.5;
-  init_cascade_position();
   Claw.set(true);
   chassis.set_coordinates(0, 0, 180);
 
@@ -309,7 +309,7 @@ void weak_side() {
   task::sleep(500);
   Claw.set(false);
   task::sleep(500);
-  set_cascade_target(-400);
+  set_cascade_target(-100);
   task::sleep(500);
   chassis.drive_distance(8);
   chassis.turn_to_angle(180);
