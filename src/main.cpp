@@ -222,6 +222,8 @@ void pre_auton() {
     }
     Brain.Screen.printAt(5, 180, "Cascade: %.1f deg", Cascade.position(degrees));
     Brain.Screen.printAt(5, 200, "Claw Dist: %.1f mm", ClawDistance.objectDistance(mm));
+    Controller1.Screen.setCursor(3, 1);
+    Controller1.Screen.print("Dist: %.1f mm", ClawDistance.objectDistance(mm));
     if(Brain.Screen.pressing()){
       while(Brain.Screen.pressing()) {}
       current_auton_selection ++;
@@ -230,6 +232,8 @@ void pre_auton() {
     }
     task::sleep(10);
   }
+  Brain.Screen.clearScreen();
+  Controller1.Screen.clearScreen();
 }
 
 /**
