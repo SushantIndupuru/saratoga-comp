@@ -259,7 +259,61 @@ void strong_side_2_2() {
   chassis.drive_distance(-5);
   task::sleep(100);
   chassis.drive_distance(10, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
-  chassis.drive_distance(-10);
-  chassis.turn_to_point(13, 17, 170);
-  chassis.drive_distance(-10, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  chassis.drive_distance(-16);
+  chassis.turn_to_angle(270);
+  chassis.drive_distance(-13, 270, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  Roller.setVelocity(100, percent);
+  task::sleep(700);
+  Roller.spinFor(forward, 700, degrees);
+  chassis.drive_distance(13, 270, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  chassis.turn_to_angle(45);
+  Claw.set(true);
+  chassis.drive_distance(20);
+  chassis.drive_max_voltage = 4;
+  chassis.drive_distance(10);
+  task::sleep(500);
+  Claw.set(false);
+  task::sleep(500);
+  set_cascade_target(-200);
+  task::sleep(500);
+  chassis.turn_to_angle(180);
+  chassis.drive_distance(15);
+
+}
+
+void weak_side() {
+  odom_constants();
+  chassis.drive_settle_error = 1.5;
+  init_cascade_position();
+  Claw.set(true);
+  chassis.set_coordinates(0, 0, 180);
+
+  chassis.drive_distance(8, 180, 6, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 300);
+  chassis.drive_distance(-5);
+  task::sleep(100);
+  chassis.drive_distance(10, 180, 6, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  chassis.drive_distance(-15.5);
+  chassis.turn_to_angle(90);
+  chassis.drive_distance(-11.75, 90, 4, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  Roller.setVelocity(50, percent);
+  task::sleep(700);
+  Roller.spinFor(forward, 700, degrees);
+  task::sleep(700);
+  chassis.drive_distance(12, 90, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  chassis.turn_to_angle(315,12,0.5,800,9999);
+  //void Drive::turn_to_angle(float angle, float turn_max_voltage, float turn_settle_error, float turn_settle_time, float turn_timeout)
+  Claw.set(true);
+  chassis.drive_distance(20);
+  chassis.drive_max_voltage = 4;
+  chassis.drive_distance(10);
+  task::sleep(500);
+  Claw.set(false);
+  task::sleep(500);
+  set_cascade_target(-400);
+  task::sleep(500);
+  chassis.drive_distance(8);
+  chassis.turn_to_angle(180);
+  chassis.drive_distance(15); //enddd
+
+  
 }

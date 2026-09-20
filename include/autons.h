@@ -8,6 +8,7 @@ extern Drive chassis;
 void default_constants();
 
 void init_cascade_position();
+void set_cascade_target(float target);
 
 void drive_test();
 void turn_test();
@@ -21,3 +22,4 @@ void tank_odom_test();
 void holonomic_odom_test();
 void pursuit_test();
 void strong_side_2_2();
+void weak_side();

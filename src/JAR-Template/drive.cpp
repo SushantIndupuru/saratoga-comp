@@ -94,6 +94,10 @@ void Drive::set_turn_constants(float turn_max_voltage, float turn_kp, float turn
   this->turn_starti = turn_starti;
 } 
 
+void Drive::set_turn_curve(float turn_curve){
+  this->turn_curve = turn_curve;
+}
+
 /**
  * Resets default drive constants.
  * Driving includes drive_distance(), drive_to_point(), and
@@ -823,6 +827,7 @@ void Drive::follow_path(const std::vector<Point> &path, float lookahead, bool re
 void Drive::control_arcade(){
   float throttle = deadband(controller(primary).Axis3.value(), 5);
   float turn = deadband(controller(primary).Axis1.value(), 5);
+  turn = copysign(pow(fabs(turn / 100.0), turn_curve) * 100.0, turn);
   DriveL.spin(fwd, to_volt(throttle+turn), volt);
   DriveR.spin(fwd, to_volt(throttle-turn), volt);
 }
@@ -835,6 +840,7 @@ void Drive::control_arcade(){
 void Drive::control_holonomic(){
   float throttle = deadband(controller(primary).Axis3.value(), 5);
   float turn = deadband(controller(primary).Axis1.value(), 5);
+  turn = copysign(pow(fabs(turn / 100.0), turn_curve) * 100.0, turn);
   float strafe = deadband(controller(primary).Axis4.value(), 5);
   DriveLF.spin(fwd, to_volt(throttle+turn+strafe), volt);
   DriveRF.spin(fwd, to_volt(throttle-turn-strafe), volt);

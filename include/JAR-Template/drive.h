@@ -44,6 +44,7 @@ public:
   float turn_ki;
   float turn_kd;
   float turn_starti;
+  float turn_curve = .6;
 
   float turn_settle_error;
   float turn_settle_time;
@@ -92,6 +93,7 @@ public:
   float get_right_position_in();
 
   void set_turn_constants(float turn_max_voltage, float turn_kp, float turn_ki, float turn_kd, float turn_starti); 
+  void set_turn_curve(float turn_curve);
   void set_drive_constants(float drive_max_voltage, float drive_kp, float drive_ki, float drive_kd, float drive_starti);
   void set_heading_constants(float heading_max_voltage, float heading_kp, float heading_ki, float heading_kd, float heading_starti);
   void set_swing_constants(float swing_max_voltage, float swing_kp, float swing_ki, float swing_kd, float swing_starti);

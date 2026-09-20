@@ -105,7 +105,7 @@ PORT12,
 
 );
 
-int current_auton_selection = 0;
+int current_auton_selection = 1;
 bool auto_started = false;
 bool driver_started = false;
 
@@ -117,10 +117,18 @@ bool cascade_grab_raise_pending = false;
 int cascade_grab_raise_ms = 0;
 bool lift_was_pressed = false;
 bool arm_was_pressed = false;
+volatile bool cascade_async_enabled = false;
 
 void reset_cascade_pid() {
   cascadePID.accumulated_error = 0;
   cascadePID.previous_error = 0;
+}
+
+void set_cascade_target(float target) {
+  cascade_target = target;
+  cascade_grab_raise_pending = false;
+  reset_cascade_pid();
+  cascade_async_enabled = true;
 }
 
 void init_cascade_position() {
@@ -129,6 +137,17 @@ void init_cascade_position() {
   cascade_target = Cascade.position(degrees);
   reset_cascade_pid();
   cascade_target=0;
+}
+
+int cascade_control_task() {
+  while (true) {
+    if (cascade_async_enabled) {
+      float output = clamp(cascadePID.compute(cascade_target - Cascade.position(degrees)), -12, 6);
+      Cascade.spin(fwd, output, volt);
+    }
+    task::sleep(20);
+  }
+  return 0;
 }
 
 /**
@@ -141,6 +160,7 @@ void init_cascade_position() {
 void pre_auton() {
   // Initializing Robot Configuration. DO NOT REMOVE!
   vexcodeInit();
+  static task cascade_task(cascade_control_task);
   default_constants();
 
   Brain.Screen.clearScreen();
@@ -176,10 +196,10 @@ void pre_auton() {
     Brain.Screen.printAt(5, 120, "Selected Auton:");
     switch(current_auton_selection){
       case 0:
-        Brain.Screen.printAt(5, 140, "Strong Side 2+2");
+        Brain.Screen.printAt(5, 140, "Strong Side");
         break;
       case 1:
-        Brain.Screen.printAt(5, 140, "Auton 1");
+        Brain.Screen.printAt(5, 140, "Weak side");
         break;
       case 2:
         Brain.Screen.printAt(5, 140, "Auton 2");
@@ -226,7 +246,7 @@ void autonomous(void) {
       strong_side_2_2();
       break;
     case 1:         
-      drive_test();
+      weak_side();
       break;
     case 2:
       turn_test();
@@ -260,6 +280,8 @@ void autonomous(void) {
 /*---------------------------------------------------------------------------*/
 
 void usercontrol(void) {
+  cascade_async_enabled = false;
+
   if (!auto_started) {
     init_cascade_position();
   }
@@ -281,6 +303,12 @@ void usercontrol(void) {
     //Replace this line with chassis.control_tank(); for tank drive 
     //or chassis.control_holonomic(); for holo drive.
     chassis.control_arcade();
+
+    if(Controller1.ButtonY.pressing()) {
+      Roller.spin(reverse, 12, volt);
+    } else {
+      Roller.stop(hold);
+    }
 
     if (Controller1.ButtonR2.pressing()) {
       Cascade.spin(reverse, 12, volt);
@@ -312,7 +340,7 @@ void usercontrol(void) {
     if (Controller1.ButtonL1.pressing()) {
       Claw.set(true);
       cascade_grab_raise_pending = false;
-    } else if (ClawDistance.objectDistance(mm) < 30) {
+    } else if (ClawDistance.objectDistance(mm) < -100) { //never trigger
       Claw.set(false);
       if (cascade_target == 0 && !cascade_was_manual && !cascade_grab_raise_pending) {
         cascade_grab_raise_pending = true;
@@ -325,6 +353,8 @@ void usercontrol(void) {
     if (Controller1.ButtonRight.pressing()) {
       if (!lift_was_pressed) {
         RightLift.set(!RightLift.value());
+        ClawDrop.set(!RightLift.value());
+        
       }
       lift_was_pressed = true;
     } else {

@@ -25,7 +25,7 @@ digital_out Claw = digital_out(Brain.ThreeWirePort.A);
 digital_out ClawDrop = digital_out(Brain.ThreeWirePort.H);
 digital_out RightLift = digital_out(Brain.ThreeWirePort.C);
 digital_out RightArm = digital_out(Brain.ThreeWirePort.B);
-distance ClawDistance = distance(PORT10);
+distance ClawDistance = distance(PORT8);
 rotation RollerRotation = rotation(PORT9);
 
 controller Controller1 = controller(primary);
