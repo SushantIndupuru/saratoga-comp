@@ -113,6 +113,7 @@ PID cascadePID(0, 0.13, 0, 0.0, 0);
 float cascade_target = 0;
 bool cascade_was_manual = false;
 bool cascade_b_was_pressed = false;
+bool cascade_a_was_pressed = false;
 bool cascade_grab_raise_pending = false;
 int cascade_grab_raise_ms = 0;
 bool lift_was_pressed = false;
@@ -338,6 +339,16 @@ void usercontrol(void) {
       } else {
         cascade_b_was_pressed = false;
       }
+
+     if (Controller1.ButtonA.pressing()) {
+      if (!cascade_a_was_pressed) {
+        cascade_target= 150;
+        reset_cascade_pid();
+      }
+      cascade_a_was_pressed = true;
+     } else {
+      cascade_a_was_pressed = false;
+     }
       float output = clamp(cascadePID.compute(cascade_target - Cascade.position(degrees)), -12, 6);
       Cascade.spin(fwd, output, volt);
     }
