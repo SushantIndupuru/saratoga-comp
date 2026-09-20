@@ -79,6 +79,8 @@ public:
   float boomerang_lead;
   float boomerang_setback;
 
+  float pursuit_lookahead = 10;
+
   Drive(enum::drive_setup drive_setup, motor_group DriveL, motor_group DriveR, int gyro_port, float wheel_diameter, float wheel_ratio, float gyro_scale, int DriveLF_port, int DriveRF_port, int DriveLB_port, int DriveRB_port, int ForwardTracker_port, float ForwardTracker_diameter, float ForwardTracker_center_distance, int SidewaysTracker_port, float SidewaysTracker_diameter, float SidewaysTracker_center_distance);
 
   void drive_with_voltage(float leftVoltage, float rightVoltage);
@@ -122,8 +124,10 @@ public:
   void position_track();
   static int position_track_task();
   vex::task odom_task;
+  bool odom_started = false;
   float get_X_position();
   float get_Y_position();
+  void start_odom(float X_position, float Y_position, float orientation_deg);
 
   void drive_stop(vex::brakeType mode);
 
@@ -148,6 +152,13 @@ public:
   void holonomic_drive_to_pose(float X_position, float Y_position, float angle, float drive_max_voltage, float heading_max_voltage);
   void holonomic_drive_to_pose(float X_position, float Y_position, float angle, float drive_max_voltage, float heading_max_voltage, float drive_settle_error, float drive_settle_time, float drive_timeout);
   void holonomic_drive_to_pose(float X_position, float Y_position, float angle, float drive_max_voltage, float heading_max_voltage, float drive_settle_error, float drive_settle_time, float drive_timeout, float drive_kp, float drive_ki, float drive_kd, float drive_starti, float heading_kp, float heading_ki, float heading_kd, float heading_starti);
+
+  void follow_path(const std::vector<Point> &path);
+  void follow_path(const std::vector<Point> &path, float lookahead);
+  void follow_path(const std::vector<Point> &path, float lookahead, bool reverse);
+  void follow_path(const std::vector<Point> &path, float lookahead, bool reverse, float drive_min_voltage, float drive_max_voltage, float heading_max_voltage);
+  void follow_path(const std::vector<Point> &path, float lookahead, bool reverse, float drive_min_voltage, float drive_max_voltage, float heading_max_voltage, float drive_settle_error, float drive_settle_time, float drive_timeout);
+  void follow_path(const std::vector<Point> &path, float lookahead, bool reverse, float drive_min_voltage, float drive_max_voltage, float heading_max_voltage, float drive_settle_error, float drive_settle_time, float drive_timeout, float drive_kp, float drive_ki, float drive_kd, float drive_starti, float heading_kp, float heading_ki, float heading_kd, float heading_starti);
 
   void control_arcade();
   void control_tank();

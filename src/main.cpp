@@ -38,19 +38,19 @@ Drive chassis(
 //HOLONOMIC_TWO_ROTATION
 //
 //Write it here:
-ZERO_TRACKER_NO_ODOM,
+TANK_TWO_ROTATION,
 
 //Add the names of your Drive motors into the motor groups below, separated by commas, i.e. motor_group(Motor1,Motor2,Motor3).
 //You will input whatever motor names you chose when you configured your robot using the sidebar configurer, they don't have to be "Motor1" and "Motor2".
 
 //Left Motors:
-motor_group(),
+motor_group(LeftFront, LeftBack),
 
 //Right Motors:
-motor_group(),
+motor_group(RightFront, RightBack),
 
 //Specify the PORT NUMBER of your inertial sensor, in PORT format (i.e. "PORT1", not simply "1"):
-PORT1,
+PORT3,
 
 //Input your wheel diameter. (4" omnis are actually closer to 4.125"):
 3.25,
@@ -76,29 +76,29 @@ PORT1,
 
 //FOR HOLONOMIC DRIVES ONLY: Input your drive motors by position. This is only necessary for holonomic drives, otherwise this section can be left alone.
 //LF:      //RF:    
-PORT1,     -PORT2,
+PORT16,    -PORT20,
 
 //LB:      //RB: 
-PORT3,     -PORT4,
+PORT15,    -PORT19,
 
-//If you are using position tracking, this is the Forward Tracker port (the tracker which runs parallel to the direction of the chassis).
-//If this is a rotation sensor, enter it in "PORT1" format, inputting the port below.
-//If this is an encoder, enter the port as an integer. Triport A will be a "1", Triport B will be a "2", etc.
-3,
+// Vertical / forward tracker (parallel to the chassis). Rotation sensor port:
+PORT13,
 
 //Input the Forward Tracker diameter (reverse it to make the direction switch):
-2.75,
+// Scaled from 1.929 after a 36" command traveled 36.75": 1.929 * 36.75/36
+1.969,
 
 //Input Forward Tracker center distance (a positive distance corresponds to a tracker on the right side of the robot, negative is left.)
 //For a zero tracker tank drive with odom, put the positive distance from the center of the robot to the right side of the drive.
 //This distance is in inches:
 -2,
 
-//Input the Sideways Tracker Port, following the same steps as the Forward Tracker Port:
-1,
+// Horizontal / sideways tracker (perpendicular to the chassis). Rotation sensor port:
+PORT12,
 
 //Sideways tracker diameter (reverse to make the direction switch):
--2.75,
+// Scaled from 1.584 after a 24" right push read 19.21": 1.584 * 24/19.21
+1.979,
 
 //Sideways tracker center distance (positive distance is behind the center of the robot, negative is in front):
 5.5
@@ -107,6 +107,29 @@ PORT3,     -PORT4,
 
 int current_auton_selection = 0;
 bool auto_started = false;
+bool driver_started = false;
+
+PID cascadePID(0, 0.13, 0, 0.0, 0);
+float cascade_target = 0;
+bool cascade_was_manual = false;
+bool cascade_b_was_pressed = false;
+bool cascade_grab_raise_pending = false;
+int cascade_grab_raise_ms = 0;
+bool lift_was_pressed = false;
+bool arm_was_pressed = false;
+
+void reset_cascade_pid() {
+  cascadePID.accumulated_error = 0;
+  cascadePID.previous_error = 0;
+}
+
+void init_cascade_position() {
+  Cascade.resetPosition();
+  Cascade.setPosition(Cascade.position(degrees) + 138, degrees);
+  cascade_target = Cascade.position(degrees);
+  reset_cascade_pid();
+  cascade_target=0;
+}
 
 /**
  * Function before autonomous. It prints the current auton number on the screen
@@ -120,7 +143,30 @@ void pre_auton() {
   vexcodeInit();
   default_constants();
 
-  while(!auto_started){
+  Brain.Screen.clearScreen();
+  Brain.Screen.printAt(5, 20, "Calibrating gyro...");
+  Brain.Screen.printAt(5, 40, "Keep the robot still.");
+  Controller1.Screen.clearScreen();
+  Controller1.Screen.setCursor(1, 1);
+  Controller1.Screen.print("Calibrating...");
+  Controller1.Screen.setCursor(2, 1);
+  Controller1.Screen.print("Keep robot still");
+
+  chassis.Gyro.calibrate();
+  while (chassis.Gyro.isCalibrating()) {
+    task::sleep(20);
+  }
+
+  Brain.Screen.printAt(5, 60, "Gyro ready.");
+  Controller1.Screen.clearScreen();
+  Controller1.Screen.setCursor(1, 1);
+  Controller1.Screen.print("Gyro ready");
+  Controller1.Screen.setCursor(2, 1);
+  Controller1.Screen.print("Heading: %.1f", chassis.get_absolute_heading());
+  Controller1.rumble(".");
+  task::sleep(500);
+
+  while(!auto_started && !driver_started){
     Brain.Screen.clearScreen();
     Brain.Screen.printAt(5, 20, "JAR Template v1.2.0");
     Brain.Screen.printAt(5, 40, "Battery Percentage:");
@@ -130,30 +176,32 @@ void pre_auton() {
     Brain.Screen.printAt(5, 120, "Selected Auton:");
     switch(current_auton_selection){
       case 0:
-        Brain.Screen.printAt(5, 140, "Auton 1");
+        Brain.Screen.printAt(5, 140, "Strong Side 2+2");
         break;
       case 1:
-        Brain.Screen.printAt(5, 140, "Auton 2");
+        Brain.Screen.printAt(5, 140, "Auton 1");
         break;
       case 2:
-        Brain.Screen.printAt(5, 140, "Auton 3");
+        Brain.Screen.printAt(5, 140, "Auton 2");
         break;
       case 3:
-        Brain.Screen.printAt(5, 140, "Auton 4");
+        Brain.Screen.printAt(5, 140, "Horizontal Odom");
         break;
       case 4:
-        Brain.Screen.printAt(5, 140, "Auton 5");
+        Brain.Screen.printAt(5, 140, "Localization");
         break;
       case 5:
-        Brain.Screen.printAt(5, 140, "Auton 6");
+        Brain.Screen.printAt(5, 140, "Vertical Odom");
         break;
       case 6:
-        Brain.Screen.printAt(5, 140, "Auton 7");
+        Brain.Screen.printAt(5, 140, "Auton 6");
         break;
       case 7:
-        Brain.Screen.printAt(5, 140, "Auton 8");
+        Brain.Screen.printAt(5, 140, "Pursuit Test");
         break;
     }
+    Brain.Screen.printAt(5, 180, "Cascade: %.1f deg", Cascade.position(degrees));
+    Brain.Screen.printAt(5, 200, "Claw Dist: %.1f mm", ClawDistance.objectDistance(mm));
     if(Brain.Screen.pressing()){
       while(Brain.Screen.pressing()) {}
       current_auton_selection ++;
@@ -175,7 +223,7 @@ void autonomous(void) {
   auto_started = true;
   switch(current_auton_selection){ 
     case 0:
-      drive_test();
+      strong_side_2_2();
       break;
     case 1:         
       drive_test();
@@ -184,19 +232,19 @@ void autonomous(void) {
       turn_test();
       break;
     case 3:
-      swing_test();
+      horizontal_odom_test();
       break;
     case 4:
-      full_test();
+      localization_test();
       break;
     case 5:
-      odom_test();
+      vertical_odom_test();
       break;
     case 6:
       tank_odom_test();
       break;
     case 7:
-      holonomic_odom_test();
+      pursuit_test();
       break;
  }
 }
@@ -212,6 +260,13 @@ void autonomous(void) {
 /*---------------------------------------------------------------------------*/
 
 void usercontrol(void) {
+  if (!auto_started) {
+    init_cascade_position();
+  }
+
+  driver_started = true;
+  Brain.Screen.clearScreen();
+
   // User control code here, inside the loop
   while (1) {
     // This is the main execution loop for the user control program.
@@ -226,6 +281,85 @@ void usercontrol(void) {
     //Replace this line with chassis.control_tank(); for tank drive 
     //or chassis.control_holonomic(); for holo drive.
     chassis.control_arcade();
+
+    if (Controller1.ButtonR2.pressing()) {
+      Cascade.spin(reverse, 12, volt);
+      cascade_target = Cascade.position(degrees);
+      cascade_was_manual = true;
+    } else if (Controller1.ButtonL2.pressing()) {
+      Cascade.spin(fwd, 6, volt);
+      cascade_target = Cascade.position(degrees);
+      cascade_was_manual = true;
+    } else {
+      if (cascade_was_manual) {
+        cascade_target = Cascade.position(degrees);
+        reset_cascade_pid();
+        cascade_was_manual = false;
+      }
+      if (Controller1.ButtonB.pressing()) {
+        if (!cascade_b_was_pressed) {
+          cascade_target = 0;
+          reset_cascade_pid();
+        }
+        cascade_b_was_pressed = true;
+      } else {
+        cascade_b_was_pressed = false;
+      }
+      float output = clamp(cascadePID.compute(cascade_target - Cascade.position(degrees)), -12, 6);
+      Cascade.spin(fwd, output, volt);
+    }
+
+    if (Controller1.ButtonL1.pressing()) {
+      Claw.set(true);
+      cascade_grab_raise_pending = false;
+    } else if (ClawDistance.objectDistance(mm) < 30) {
+      Claw.set(false);
+      if (cascade_target == 0 && !cascade_was_manual && !cascade_grab_raise_pending) {
+        cascade_grab_raise_pending = true;
+        cascade_grab_raise_ms = Brain.Timer.time(msec);
+      }
+    } else {
+      Claw.set(Controller1.ButtonR1.pressing());
+    }
+
+    if (Controller1.ButtonRight.pressing()) {
+      if (!lift_was_pressed) {
+        RightLift.set(!RightLift.value());
+      }
+      lift_was_pressed = true;
+    } else {
+      lift_was_pressed = false;
+    }
+
+    if (Controller1.ButtonDown.pressing()) {
+      if (!arm_was_pressed) {
+        RightArm.set(!RightArm.value());
+      }
+      arm_was_pressed = true;
+    } else {
+      arm_was_pressed = false;
+    }
+
+    if (cascade_was_manual) {
+      cascade_grab_raise_pending = false;
+    }
+
+    if (cascade_grab_raise_pending && Brain.Timer.time(msec) - cascade_grab_raise_ms >= 100) {
+      cascade_target -= 200;
+      reset_cascade_pid();
+      cascade_grab_raise_pending = false;
+    }
+
+    // Brain.Screen.clearScreen();
+    // Brain.Screen.setCursor(1, 1);
+    // Brain.Screen.print("Cascade: %.1f deg", Cascade.position(degrees));
+    // Brain.Screen.setCursor(2, 1);
+    // Brain.Screen.print("Claw Dist: %.1f mm", ClawDistance.objectDistance(mm));
+    // Controller1.Screen.clearScreen();
+    // Controller1.Screen.setCursor(1, 1);
+    // Controller1.Screen.print("Cas: %.1f deg", Cascade.position(degrees));
+    // Controller1.Screen.setCursor(2, 1);
+    // Controller1.Screen.print("Claw: %.1f mm", ClawDistance.objectDistance(mm));
 
     wait(20, msec); // Sleep the task for a short amount of time to
                     // prevent wasted resources.

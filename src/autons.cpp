@@ -34,6 +34,7 @@ void odom_constants(){
   chassis.drive_settle_error = 3;
   chassis.boomerang_lead = .5;
   chassis.drive_min_voltage = 0;
+  chassis.pursuit_lookahead = 10;
 }
 
 /**
@@ -41,10 +42,12 @@ void odom_constants(){
  */
 
 void drive_test(){
-  chassis.drive_distance(6);
-  chassis.drive_distance(12);
-  chassis.drive_distance(18);
-  chassis.drive_distance(-36);
+  odom_constants();
+  chassis.drive_settle_error = 0.5;
+  chassis.set_coordinates(0, 0, 0);
+  chassis.drive_distance(36);
+  chassis.drive_stop(hold);
+  while (true) {}
 }
 
 /**
@@ -52,11 +55,14 @@ void drive_test(){
  */
 
 void turn_test(){
-  chassis.turn_to_angle(5);
-  chassis.turn_to_angle(30);
+  //odom_constants();
   chassis.turn_to_angle(90);
-  chassis.turn_to_angle(225);
+  task::sleep(1000);
+
   chassis.turn_to_angle(0);
+  task::sleep(1000);
+
+
 }
 
 /**
@@ -101,6 +107,85 @@ void odom_test(){
 }
 
 /**
+ * Horizontal (sideways) tracker checkout. Push the robot by hand.
+ * Keep heading near 0. Slide 24" to the robot's right; X should read 24
+ * and Y should stay near 0. Then spin 360 in place; X and Y should
+ * stay near 0.
+ */
+
+void horizontal_odom_test(){
+  chassis.set_coordinates(0, 0, 0);
+  while(1){
+    Brain.Screen.clearScreen();
+    Brain.Screen.printAt(5, 20, "Horizontal odom test");
+    Brain.Screen.printAt(5, 40, "Push 24in RIGHT, heading 0");
+    Brain.Screen.printAt(5, 60, "X (want 24): %.2f", chassis.get_X_position());
+    Brain.Screen.printAt(5, 80, "Y (want 0):  %.2f", chassis.get_Y_position());
+    Brain.Screen.printAt(5, 100, "Heading:     %.2f", chassis.get_absolute_heading());
+    Brain.Screen.printAt(5, 120, "Sideways:    %.2f", chassis.get_SidewaysTracker_position());
+    Brain.Screen.printAt(5, 140, "Forward:     %.2f", chassis.get_ForwardTracker_position());
+    task::sleep(20);
+  }
+}
+
+/**
+ * Vertical (forward) tracker checkout. Push the robot by hand.
+ * Keep heading near 0. Slide 24" forward; Y should read 24
+ * and X should stay near 0.
+ */
+
+void vertical_odom_test(){
+  chassis.set_coordinates(0, 0, 0);
+  while(1){
+    Brain.Screen.clearScreen();
+    Brain.Screen.printAt(5, 20, "Vertical odom test");
+    Brain.Screen.printAt(5, 40, "Push 24in FORWARD, heading 0");
+    Brain.Screen.printAt(5, 60, "X (want 0):  %.2f", chassis.get_X_position());
+    Brain.Screen.printAt(5, 80, "Y (want 24): %.2f", chassis.get_Y_position());
+    Brain.Screen.printAt(5, 100, "Heading:     %.2f", chassis.get_absolute_heading());
+    Brain.Screen.printAt(5, 120, "Sideways:    %.2f", chassis.get_SidewaysTracker_position());
+    Brain.Screen.printAt(5, 140, "Forward:     %.2f", chassis.get_ForwardTracker_position());
+    task::sleep(20);
+  }
+}
+
+/**
+ * Full localization checkout. Push by hand; pose should match the field.
+ *   1. Forward 24" along +Y  -> (0, 24, 0)
+ *   2. Right 24" along +X    -> (24, 24, 0)
+ *   3. Spin 360 in place     -> still (24, 24, 0)
+ *   4. Push back to start    -> (0, 0, 0)
+ */
+
+void localization_test(){
+  chassis.set_coordinates(0, 0, 0);
+  while(1){
+    float x = chassis.get_X_position();
+    float y = chassis.get_Y_position();
+    float heading = chassis.get_absolute_heading();
+
+    Brain.Screen.clearScreen();
+    Brain.Screen.printAt(5, 20, "Localization test");
+    Brain.Screen.printAt(5, 40, "X:       %.2f", x);
+    Brain.Screen.printAt(5, 60, "Y:       %.2f", y);
+    Brain.Screen.printAt(5, 80, "Heading: %.2f", heading);
+    Brain.Screen.printAt(5, 100, "Fwd: %.2f  Side: %.2f", chassis.get_ForwardTracker_position(), chassis.get_SidewaysTracker_position());
+    Brain.Screen.printAt(5, 140, "1. +Y 24 -> (0, 24)");
+    Brain.Screen.printAt(5, 160, "2. +X 24 -> (24, 24)");
+    Brain.Screen.printAt(5, 180, "3. Spin 360, pose holds");
+    Brain.Screen.printAt(5, 200, "4. Back to (0, 0, 0)");
+
+    Controller1.Screen.clearScreen();
+    Controller1.Screen.setCursor(1, 1);
+    Controller1.Screen.print("X:%.1f Y:%.1f", x, y);
+    Controller1.Screen.setCursor(2, 1);
+    Controller1.Screen.print("H:%.1f", heading);
+
+    task::sleep(50);
+  }
+}
+
+/**
  * Should end in the same place it began, but the second movement
  * will be curved while the first is straight.
  */
@@ -111,6 +196,33 @@ void tank_odom_test(){
   chassis.turn_to_point(24, 24);
   chassis.drive_to_point(24,24);
   chassis.drive_to_point(0,0);
+  chassis.turn_to_angle(0);
+}
+
+/**
+ * Pure Pursuit checkout on a 1x2 tile strip.
+ * Place the robot with its back against the near tile edge, facing
+ * down the 2-tile (+Y) axis. Space is 24" wide and 48" ahead of the back.
+ * Drives 36" forward, turns around, drives back, then faces 0.
+ */
+
+void pursuit_test(){
+  odom_constants();
+  chassis.pursuit_lookahead = 4;
+  chassis.set_coordinates(0, 0, 0);
+
+  chassis.follow_path({
+    {0, 0},
+    {0, 36}
+  });
+
+  chassis.turn_to_angle(180);
+
+  chassis.follow_path({
+    {0, 36},
+    {0, 0}
+  });
+
   chassis.turn_to_angle(0);
 }
 
@@ -126,4 +238,28 @@ void holonomic_odom_test(){
   chassis.holonomic_drive_to_pose(18, 0, 180);
   chassis.holonomic_drive_to_pose(0, 18, 270);
   chassis.holonomic_drive_to_pose(0, 0, 0);
+}
+
+void strong_side_2_2() {
+  odom_constants();
+  chassis.drive_settle_error = 1.5;
+  init_cascade_position();
+  Claw.set(true);
+  chassis.set_coordinates(0, 0, 180);
+  
+  // chassis.drive_to_point(0, 4);
+  // ClawDrop.set(false);
+  // Roller.setVelocity(100, percent);
+  // Roller.spinFor(forward, 700, degrees);
+  // ClawDrop.set(true);
+  // task::sleep(300);
+  // chassis.drive_distance(4, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 600);
+  // Claw.set(false);
+  chassis.drive_distance(8, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 300);
+  chassis.drive_distance(-5);
+  task::sleep(100);
+  chassis.drive_distance(10, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
+  chassis.drive_distance(-10);
+  chassis.turn_to_point(13, 17, 170);
+  chassis.drive_distance(-10, 180, chassis.drive_max_voltage, chassis.heading_max_voltage, chassis.drive_settle_error, chassis.drive_settle_time, 400);
 }

@@ -280,9 +280,9 @@ void Drive::turn_to_angle(float angle, float turn_max_voltage, float turn_settle
  * Drive distance does not optimize for direction, so it won't try
  * to drive at the opposite heading from the one given to get there faster.
  * You can control the heading, but if you choose not to, it will drive with the
- * heading it's currently facing. It uses the average of the left and right
- * motor groups to calculate distance driven.
- * 
+ * heading it's currently facing. Distance is measured from odometry (tracking
+ * wheels), not the drive motors.
+ *
  * @param distance Desired distance in inches.
  * @param heading Desired heading in degrees.
  */
@@ -304,13 +304,18 @@ void Drive::drive_distance(float distance, float heading, float drive_max_voltag
 }
 
 void Drive::drive_distance(float distance, float heading, float drive_max_voltage, float heading_max_voltage, float drive_settle_error, float drive_settle_time, float drive_timeout, float drive_kp, float drive_ki, float drive_kd, float drive_starti, float heading_kp, float heading_ki, float heading_kd, float heading_starti){
+  if (!odom_started){
+    start_odom(get_X_position(), get_Y_position(), get_absolute_heading());
+  }
+
   PID drivePID(distance, drive_kp, drive_ki, drive_kd, drive_starti, drive_settle_error, drive_settle_time, drive_timeout);
   PID headingPID(reduce_negative_180_to_180(heading - get_absolute_heading()), heading_kp, heading_ki, heading_kd, heading_starti);
-  float start_average_position = (get_left_position_in()+get_right_position_in())/2.0;
-  float average_position = start_average_position;
+  float start_x = get_X_position();
+  float start_y = get_Y_position();
+  float heading_rad = to_rad(heading);
   while(drivePID.is_settled() == false){
-    average_position = (get_left_position_in()+get_right_position_in())/2.0;
-    float drive_error = distance+start_average_position-average_position;
+    float traveled = (get_X_position() - start_x) * sin(heading_rad) + (get_Y_position() - start_y) * cos(heading_rad);
+    float drive_error = distance - traveled;
     float heading_error = reduce_negative_180_to_180(heading - get_absolute_heading());
     float drive_output = drivePID.compute(drive_error);
     float heading_output = headingPID.compute(heading_error);
@@ -431,9 +436,18 @@ void Drive::set_heading(float orientation_deg){
  */
 
 void Drive::set_coordinates(float X_position, float Y_position, float orientation_deg){
+  start_odom(X_position, Y_position, orientation_deg);
+}
+
+void Drive::start_odom(float X_position, float Y_position, float orientation_deg){
+  R_ForwardTracker.resetPosition();
+  R_SidewaysTracker.resetPosition();
   odom.set_position(X_position, Y_position, orientation_deg, get_ForwardTracker_position(), get_SidewaysTracker_position());
   set_heading(orientation_deg);
-  odom_task = task(position_track_task);
+  if (!odom_started){
+    odom_task = task(position_track_task);
+    odom_started = true;
+  }
 }
 
 /**
@@ -679,6 +693,124 @@ void Drive::holonomic_drive_to_pose(float X_position, float Y_position, float an
     DriveLB.spin(fwd, drive_output*cos(-to_rad(get_absolute_heading()) - heading_error + 3*M_PI/4) + turn_output, volt);
     DriveRB.spin(fwd, drive_output*cos(to_rad(get_absolute_heading()) + heading_error - M_PI/4) - turn_output, volt);
     DriveRF.spin(fwd, drive_output*cos(-to_rad(get_absolute_heading()) - heading_error + 3*M_PI/4) - turn_output, volt);
+    task::sleep(10);
+  }
+}
+
+/**
+ * Follows a polyline with Pure Pursuit.
+ * Each cycle finds a lookahead point on the path and uses the same
+ * drive/heading PID pair as drive_to_point() to steer toward it.
+ * Speed is based on remaining path length so the robot decelerates
+ * into the last waypoint. Progress only moves forward along the path.
+ *
+ * @param path Waypoints in inches, field-centric. 0 degrees is +Y.
+ * @param lookahead Lookahead radius in inches. Larger is smoother and
+ * cuts corners more; smaller tracks the path more tightly.
+ * @param reverse If true, follows the path driving backward.
+ */
+
+void Drive::follow_path(const std::vector<Point> &path){
+  follow_path(path, pursuit_lookahead, false, drive_min_voltage, drive_max_voltage, heading_max_voltage, drive_settle_error, drive_settle_time, drive_timeout, drive_kp, drive_ki, drive_kd, drive_starti, heading_kp, heading_ki, heading_kd, heading_starti);
+}
+
+void Drive::follow_path(const std::vector<Point> &path, float lookahead){
+  follow_path(path, lookahead, false, drive_min_voltage, drive_max_voltage, heading_max_voltage, drive_settle_error, drive_settle_time, drive_timeout, drive_kp, drive_ki, drive_kd, drive_starti, heading_kp, heading_ki, heading_kd, heading_starti);
+}
+
+void Drive::follow_path(const std::vector<Point> &path, float lookahead, bool reverse){
+  follow_path(path, lookahead, reverse, drive_min_voltage, drive_max_voltage, heading_max_voltage, drive_settle_error, drive_settle_time, drive_timeout, drive_kp, drive_ki, drive_kd, drive_starti, heading_kp, heading_ki, heading_kd, heading_starti);
+}
+
+void Drive::follow_path(const std::vector<Point> &path, float lookahead, bool reverse, float drive_min_voltage, float drive_max_voltage, float heading_max_voltage){
+  follow_path(path, lookahead, reverse, drive_min_voltage, drive_max_voltage, heading_max_voltage, drive_settle_error, drive_settle_time, drive_timeout, drive_kp, drive_ki, drive_kd, drive_starti, heading_kp, heading_ki, heading_kd, heading_starti);
+}
+
+void Drive::follow_path(const std::vector<Point> &path, float lookahead, bool reverse, float drive_min_voltage, float drive_max_voltage, float heading_max_voltage, float drive_settle_error, float drive_settle_time, float drive_timeout){
+  follow_path(path, lookahead, reverse, drive_min_voltage, drive_max_voltage, heading_max_voltage, drive_settle_error, drive_settle_time, drive_timeout, drive_kp, drive_ki, drive_kd, drive_starti, heading_kp, heading_ki, heading_kd, heading_starti);
+}
+
+void Drive::follow_path(const std::vector<Point> &path, float lookahead, bool reverse, float drive_min_voltage, float drive_max_voltage, float heading_max_voltage, float drive_settle_error, float drive_settle_time, float drive_timeout, float drive_kp, float drive_ki, float drive_kd, float drive_starti, float heading_kp, float heading_ki, float heading_kd, float heading_starti){
+  if (path.empty()){
+    return;
+  }
+  if (!odom_started){
+    start_odom(get_X_position(), get_Y_position(), get_absolute_heading());
+  }
+  if (path.size() == 1){
+    drive_to_point(path[0].x, path[0].y, drive_min_voltage, drive_max_voltage, heading_max_voltage, drive_settle_error, drive_settle_time, drive_timeout, drive_kp, drive_ki, drive_kd, drive_starti, heading_kp, heading_ki, heading_kd, heading_starti);
+    return;
+  }
+
+  PurePursuit pursuit;
+  pursuit.set_path(path);
+
+  Point end = path.back();
+  float end_angle = to_deg(atan2(end.x - path[path.size() - 2].x, end.y - path[path.size() - 2].y));
+  if (reverse){
+    end_angle = reduce_0_to_360(end_angle + 180);
+  }
+
+  float remaining = pursuit.get_remaining_distance(get_X_position(), get_Y_position());
+  float end_error = hypot(end.x - get_X_position(), end.y - get_Y_position());
+  PID drivePID(fmax(remaining, end_error), drive_kp, drive_ki, drive_kd, drive_starti, drive_settle_error, drive_settle_time, drive_timeout);
+  PID headingPID(0, heading_kp, heading_ki, heading_kd, heading_starti);
+
+  bool line_settled = false;
+  bool prev_line_settled = is_line_settled(end.x, end.y, end_angle, get_X_position(), get_Y_position());
+  while (!drivePID.is_settled()){
+    float robot_x = get_X_position();
+    float robot_y = get_Y_position();
+    remaining = pursuit.get_remaining_distance(robot_x, robot_y);
+    end_error = hypot(end.x - robot_x, end.y - robot_y);
+
+    line_settled = is_line_settled(end.x, end.y, end_angle, robot_x, robot_y);
+    if (line_settled && !prev_line_settled && end_error < lookahead){
+      break;
+    }
+    prev_line_settled = line_settled;
+
+    Point look = pursuit.get_lookahead_point(robot_x, robot_y, lookahead);
+    float look_dist = hypot(look.x - robot_x, look.y - robot_y);
+    float drive_error = fmax(remaining, end_error);
+
+    float heading_error;
+    if (look_dist < 0.5){
+      heading_error = reduce_negative_180_to_180(end_angle - get_absolute_heading());
+    } else {
+      heading_error = reduce_negative_180_to_180(to_deg(atan2(look.x - robot_x, look.y - robot_y)) - get_absolute_heading());
+    }
+
+    bool going_reverse = reverse;
+    if (reverse){
+      heading_error = reduce_negative_180_to_180(heading_error + 180);
+    } else if (fabs(heading_error) > 90){
+      going_reverse = true;
+      heading_error = reduce_negative_180_to_180(heading_error + 180);
+    }
+
+    float drive_output = drivePID.compute(drive_error);
+    if (going_reverse){
+      drive_output = -drive_output;
+    }
+
+    float heading_scale_factor = cos(to_rad(heading_error));
+    drive_output *= heading_scale_factor;
+    float heading_output = headingPID.compute(heading_error);
+
+    if (drive_error < drive_settle_error){
+      heading_output = 0;
+    }
+
+    drive_output = clamp(drive_output, -fabs(heading_scale_factor) * drive_max_voltage, fabs(heading_scale_factor) * drive_max_voltage);
+    heading_output = clamp(heading_output, -heading_max_voltage, heading_max_voltage);
+    drive_output = clamp_min_voltage(drive_output, drive_min_voltage);
+
+    if (going_reverse){
+      heading_output = -heading_output;
+    }
+
+    drive_with_voltage(left_voltage_scaling(drive_output, heading_output), right_voltage_scaling(drive_output, heading_output));
     task::sleep(10);
   }
 }

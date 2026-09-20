@@ -2,11 +2,24 @@ using namespace vex;
 
 extern brain Brain;
 
-//To set up a motor called LeftFront here, you'd use
-//extern motor LeftFront;
+extern motor LeftFront;
+extern motor LeftBack;
+extern motor RightFront;
+extern motor RightBack;
 
-//Add your devices below, and don't forget to do the same in robot-config.cpp:
+extern motor Roller;
+extern motor Cascade1;
+extern motor Cascade2;
+extern motor Cascade3;
+extern motor_group Cascade;
 
+extern digital_out Claw;
+extern digital_out ClawDrop;
+extern digital_out RightLift;
+extern digital_out RightArm;
+extern distance ClawDistance;
+extern rotation RollerRotation;
 
+extern controller Controller1;
 
 void  vexcodeInit( void );
